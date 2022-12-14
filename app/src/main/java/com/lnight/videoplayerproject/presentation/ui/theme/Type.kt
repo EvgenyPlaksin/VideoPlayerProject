@@ -1,4 +1,4 @@
-package com.lnight.videoplayerproject.ui.theme
+package com.lnight.videoplayerproject.presentation.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

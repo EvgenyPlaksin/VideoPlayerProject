@@ -1,4 +1,4 @@
-package com.lnight.videoplayerproject
+package com.lnight.videoplayerproject.presentation.upload_video_screen
 
 import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import com.lnight.videoplayerproject.presentation.MetadataReader
+import com.lnight.videoplayerproject.presentation.VideoItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map

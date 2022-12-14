@@ -1,4 +1,4 @@
-package com.lnight.videoplayerproject
+package com.lnight.videoplayerproject.presentation
 
 import android.app.Application
 import android.net.Uri
