@@ -1,8 +1,10 @@
-package com.lnight.videoplayerproject.presentation
+package com.lnight.videoplayerproject.di
 
 import android.app.Application
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import com.lnight.videoplayerproject.presentation.MetadataReader
+import com.lnight.videoplayerproject.presentation.MetadataReaderImpl
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

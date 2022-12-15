@@ -1,5 +1,6 @@
 package com.lnight.videoplayerproject.presentation.upload_video_screen
 
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -31,6 +32,7 @@ fun UploadVideoScreen(
     viewModel: MainViewModel
 ) {
     val videoItems by viewModel.videoItems.collectAsState()
+    Log.e("TAG", "videoItems -> $videoItems")
     val selectVideoLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
         onResult = { uri ->
