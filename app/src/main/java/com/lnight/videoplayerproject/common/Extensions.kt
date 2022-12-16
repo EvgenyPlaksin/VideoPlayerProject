@@ -37,24 +37,6 @@ fun Context.showSystemUi() {
     ).show(WindowInsetsCompat.Type.systemBars())
 }
 
-// fun Context.getVideoPath(): List<Pair<String?, Uri?>> {
-//    val uri: Uri = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-//    val projection = arrayOf(MediaStore.Video.VideoColumns.DATA)
-//    val cursor: Cursor? = this.contentResolver.query(uri, projection, null, null, null)
-//    val pathArrList = ArrayList<Pair<String?, Uri>>()
-//     try {
-//    if (cursor != null) {
-//        while (cursor.moveToNext()) {
-//            pathArrList.add(Pair(cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATA)).toUri().lastPathSegment,cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATA)).toUri()))
-//            cursor.close()
-//        }
-//    }
-//     } catch (e: Exception) {
-//         e.printStackTrace()
-//     }
-//    return pathArrList
-//}
-
 fun Context.getVideoPath(): List<Pair<String?, Uri?>> {
     val videoItemHashSet: MutableList<Pair<String?, Uri?>> = mutableListOf()
     val projection = arrayOf(

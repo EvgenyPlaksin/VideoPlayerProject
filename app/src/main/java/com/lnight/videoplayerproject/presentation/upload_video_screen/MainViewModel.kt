@@ -9,6 +9,7 @@ import com.lnight.videoplayerproject.presentation.MetadataReader
 import com.lnight.videoplayerproject.presentation.VideoItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
+import java.io.File
 import javax.inject.Inject
 
 @HiltViewModel
@@ -24,7 +25,7 @@ class MainViewModel @Inject constructor(
                 VideoItem(
                     contentUri = pair.second,
                     mediaItem = MediaItem.fromUri(pair.second),
-                    name = metadataReader.getMetadataFromUri(pair.second)?.fileName ?: "No name"
+                    name = pair.first ?: metadataReader.getMetadataFromUri(pair.second)?.fileName ?: "No name"
                 )
             }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -34,24 +35,53 @@ class MainViewModel @Inject constructor(
     }
 
     fun addVideoUri(uri: Uri, name: String? = null) {
-        videoUris.value = videoUris.value + Pair(name, uri)
-        val defaultValue = videoUris.value.map { pair ->
-            VideoItem(
-                contentUri = pair.second,
-                mediaItem = MediaItem.fromUri(pair.second),
-                name = pair.first ?: metadataReader.getMetadataFromUri(pair.second)?.fileName ?: "No name"
-            )
-        }
-        videoItems = videoUris.map { uris ->
-            uris.map { pair ->
+        if(!videoUris.value.contains(Pair(name, uri))) {
+            videoUris.value = videoUris.value + Pair(name, uri)
+            val defaultValue = videoUris.value.map { pair ->
                 VideoItem(
                     contentUri = pair.second,
                     mediaItem = MediaItem.fromUri(pair.second),
-                    name = pair.first ?: metadataReader.getMetadataFromUri(pair.second)?.fileName ?: "No name"
+                    name = pair.first ?: metadataReader.getMetadataFromUri(pair.second)?.fileName
+                    ?: "No name"
                 )
             }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), defaultValue)
-        player.addMediaItem(MediaItem.fromUri(uri))
+            videoItems = videoUris.map { uris ->
+                uris.map { pair ->
+                    VideoItem(
+                        contentUri = pair.second,
+                        mediaItem = MediaItem.fromUri(pair.second),
+                        name = pair.first
+                            ?: metadataReader.getMetadataFromUri(pair.second)?.fileName ?: "No name"
+                    )
+                }
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), defaultValue)
+            player.addMediaItem(MediaItem.fromUri(uri))
+        }
+        videoUris.value.forEach { u ->
+            if (!File(u.second.toString()).exists()) {
+                videoUris.value = videoUris.value - Pair(u.first, u.second)
+                val defaultValue = videoUris.value.map { pair ->
+                    VideoItem(
+                        contentUri = pair.second,
+                        mediaItem = MediaItem.fromUri(pair.second),
+                        name = pair.first
+                            ?: metadataReader.getMetadataFromUri(pair.second)?.fileName
+                            ?: "No name"
+                    )
+                }
+                videoItems = videoUris.map { uris ->
+                    uris.map { pair ->
+                        VideoItem(
+                            contentUri = pair.second,
+                            mediaItem = MediaItem.fromUri(pair.second),
+                            name = pair.first
+                                ?: metadataReader.getMetadataFromUri(pair.second)?.fileName
+                                ?: "No name"
+                        )
+                    }
+                }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), defaultValue)
+            }
+        }
     }
 
     fun playVideo(uri: Uri) {
