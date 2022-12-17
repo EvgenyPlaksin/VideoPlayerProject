@@ -4,7 +4,7 @@ import android.app.Application
 import android.net.Uri
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -30,7 +30,7 @@ class MainViewModel @Inject constructor(
     val player: Player,
     private val metadataReader: MetadataReader,
     private val app: Application
-): ViewModel() {
+): AndroidViewModel(app) {
 
     private val videoUris = MutableStateFlow<List<Triple<String?, Uri, ImageBitmap?>>>(emptyList())
 
