@@ -49,21 +49,10 @@ class MainViewModel @Inject constructor(
         player.prepare()
     }
 
-    fun addVideoUri(uri: Uri, name: String? = null) {
+    fun addVideoUri(urisWithData: List<Pair<String?, Uri?>>, singleMode: Boolean = false) {
         viewModelScope.launch {
-            val bitmap = getFrameAsBitmap(uri)
-            if (!videoUris.value.contains(Triple(name, uri, bitmap))) {
-                videoUris.value = videoUris.value + Triple(name, uri, bitmap)
-                val defaultValue = videoUris.value.map { uriWithData ->
-                    VideoItem(
-                        contentUri = uriWithData.second,
-                        mediaItem = MediaItem.fromUri(uriWithData.second),
-                        name = uriWithData.first
-                            ?: metadataReader.getMetadataFromUri(uriWithData.second)?.fileName
-                            ?: "No name",
-                        videoFrame = uriWithData.third
-                    )
-                }
+            if(!singleMode) {
+                videoUris.value = emptyList()
                 videoItems = videoUris.map { uris ->
                     uris.map { uriWithData ->
                         VideoItem(
@@ -75,12 +64,13 @@ class MainViewModel @Inject constructor(
                             videoFrame = uriWithData.third
                         )
                     }
-                }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), defaultValue)
-                player.addMediaItem(MediaItem.fromUri(uri))
+                }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
             }
-            videoUris.value.forEach { u ->
-                if (!File(u.second.toString()).exists()) {
-                    videoUris.value = videoUris.value - Triple(u.first, u.second, u.third)
+            urisWithData.forEach {
+                if(it.second != null) {
+                val bitmap = getFrameAsBitmap(it.second!!)
+                if (!videoUris.value.contains(Triple(it.first, it.second, bitmap))) {
+                    videoUris.value = videoUris.value + Triple(it.first, it.second!!, bitmap)
                     val defaultValue = videoUris.value.map { uriWithData ->
                         VideoItem(
                             contentUri = uriWithData.second,
@@ -103,6 +93,39 @@ class MainViewModel @Inject constructor(
                             )
                         }
                     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), defaultValue)
+                    player.addMediaItem(MediaItem.fromUri(it.second!!))
+                }
+                videoUris.value.forEach { u ->
+                    if (!File(u.second.toString()).exists()) {
+                        videoUris.value = videoUris.value - Triple(u.first, u.second, u.third)
+                        val defaultValue = videoUris.value.map { uriWithData ->
+                            VideoItem(
+                                contentUri = uriWithData.second,
+                                mediaItem = MediaItem.fromUri(uriWithData.second),
+                                name = uriWithData.first
+                                    ?: metadataReader.getMetadataFromUri(uriWithData.second)?.fileName
+                                    ?: "No name",
+                                videoFrame = uriWithData.third
+                            )
+                        }
+                        videoItems = videoUris.map { uris ->
+                            uris.map { uriWithData ->
+                                VideoItem(
+                                    contentUri = uriWithData.second,
+                                    mediaItem = MediaItem.fromUri(uriWithData.second),
+                                    name = uriWithData.first
+                                        ?: metadataReader.getMetadataFromUri(uriWithData.second)?.fileName
+                                        ?: "No name",
+                                    videoFrame = uriWithData.third
+                                )
+                            }
+                        }.stateIn(
+                            viewModelScope,
+                            SharingStarted.WhileSubscribed(5000),
+                            defaultValue
+                        )
+                    }
+                }
                 }
             }
         }

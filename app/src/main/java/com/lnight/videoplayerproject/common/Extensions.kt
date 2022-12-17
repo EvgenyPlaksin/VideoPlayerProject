@@ -3,8 +3,10 @@ package com.lnight.videoplayerproject.common
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.Intent
 import android.net.Uri
 import android.provider.MediaStore
+import android.provider.Settings
 import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -57,4 +59,11 @@ fun Context.getVideoPath(): List<Pair<String?, Uri?>> {
         }
     }
     return videoItemHashSet
+}
+
+fun Context.openAppDetails() {
+    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+    val uri = Uri.fromParts("package", packageName, null)
+    intent.data = uri
+    startActivity(intent)
 }
