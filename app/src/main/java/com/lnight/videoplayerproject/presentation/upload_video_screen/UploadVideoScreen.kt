@@ -1,6 +1,5 @@
 package com.lnight.videoplayerproject.presentation.upload_video_screen
 
-import android.media.MediaMetadataRetriever
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -12,15 +11,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FileOpen
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -31,6 +26,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.NavController
 import com.lnight.videoplayerproject.common.getVideoPath
+
 
 @Composable
 fun UploadVideoScreen(
@@ -45,13 +41,12 @@ fun UploadVideoScreen(
             uri?.let(viewModel::addVideoUri)
         }
     )
-
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(key1 = lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if(event == Lifecycle.Event.ON_START) {
-                val uris = context.getVideoPath()
-                uris.forEach { uriWithData ->
+                val urisWithData = context.getVideoPath()
+                urisWithData.forEach { uriWithData ->
                     uriWithData.second?.let {
                         viewModel.addVideoUri(
                             it,
@@ -128,16 +123,11 @@ fun UploadVideoScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val mMMR = MediaMetadataRetriever()
-                    mMMR.setDataSource(context, item.contentUri)
-                    val btm by remember {
-                        mutableStateOf(mMMR.frameAtTime)
-                    }
-                    if(btm != null) {
+                    if(item.videoFrame != null) {
                         Image(
                             contentScale = ContentScale.FillBounds,
-                            bitmap = btm!!.asImageBitmap(),
-                            contentDescription = "file image",
+                            bitmap = item.videoFrame,
+                            contentDescription = "file Image",
                             modifier = Modifier
                                 .size(width = 110.dp, height = 90.dp)
                                 .clip(RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp))
