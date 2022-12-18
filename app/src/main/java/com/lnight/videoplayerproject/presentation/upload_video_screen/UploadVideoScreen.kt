@@ -54,7 +54,7 @@ fun UploadVideoScreen(
             android.Manifest.permission.READ_EXTERNAL_STORAGE
         )
     }
-    val videoItems by viewModel.videoItems.collectAsState()
+    val videoItems = viewModel.videoItems
     val context = LocalContext.current
     val selectVideoLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),

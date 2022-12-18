@@ -2,6 +2,9 @@ package com.lnight.videoplayerproject.presentation.upload_video_screen
 
 import android.app.Application
 import android.net.Uri
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.AndroidViewModel
@@ -16,9 +19,6 @@ import com.lnight.videoplayerproject.presentation.VideoItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -34,16 +34,8 @@ class MainViewModel @Inject constructor(
 
     private val videoUris = MutableStateFlow<List<Triple<String?, Uri, ImageBitmap?>>>(emptyList())
 
-    var videoItems = videoUris.map { uris ->
-            uris.map { uriWithData ->
-                VideoItem(
-                    contentUri = uriWithData.second,
-                    mediaItem = MediaItem.fromUri(uriWithData.second),
-                    name = uriWithData.first ?: metadataReader.getMetadataFromUri(uriWithData.second)?.fileName ?: "No name",
-                    videoFrame = uriWithData.third
-                )
-            }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    var videoItems by mutableStateOf<List<VideoItem>>(emptyList())
+        private set
 
     init {
         player.prepare()
@@ -53,25 +45,14 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             if(!singleMode) {
                 videoUris.value = emptyList()
-                videoItems = videoUris.map { uris ->
-                    uris.map { uriWithData ->
-                        VideoItem(
-                            contentUri = uriWithData.second,
-                            mediaItem = MediaItem.fromUri(uriWithData.second),
-                            name = uriWithData.first
-                                ?: metadataReader.getMetadataFromUri(uriWithData.second)?.fileName
-                                ?: "No name",
-                            videoFrame = uriWithData.third
-                        )
-                    }
-                }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+                videoItems = emptyList()
             }
             urisWithData.forEach {
                 if(it.second != null) {
                 val bitmap = getFrameAsBitmap(it.second!!)
                 if (!videoUris.value.contains(Triple(it.first, it.second, bitmap))) {
                     videoUris.value = videoUris.value + Triple(it.first, it.second!!, bitmap)
-                    val defaultValue = videoUris.value.map { uriWithData ->
+                    val newValue = videoUris.value.map { uriWithData ->
                         VideoItem(
                             contentUri = uriWithData.second,
                             mediaItem = MediaItem.fromUri(uriWithData.second),
@@ -81,24 +62,13 @@ class MainViewModel @Inject constructor(
                             videoFrame = uriWithData.third
                         )
                     }
-                    videoItems = videoUris.map { uris ->
-                        uris.map { uriWithData ->
-                            VideoItem(
-                                contentUri = uriWithData.second,
-                                mediaItem = MediaItem.fromUri(uriWithData.second),
-                                name = uriWithData.first
-                                    ?: metadataReader.getMetadataFromUri(uriWithData.second)?.fileName
-                                    ?: "No name",
-                                videoFrame = uriWithData.third
-                            )
-                        }
-                    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), defaultValue)
+                    videoItems = newValue
                     player.addMediaItem(MediaItem.fromUri(it.second!!))
                 }
                 videoUris.value.forEach { u ->
                     if (!File(u.second.toString()).exists()) {
                         videoUris.value = videoUris.value - Triple(u.first, u.second, u.third)
-                        val defaultValue = videoUris.value.map { uriWithData ->
+                        val newValue = videoUris.value.map { uriWithData ->
                             VideoItem(
                                 contentUri = uriWithData.second,
                                 mediaItem = MediaItem.fromUri(uriWithData.second),
@@ -108,22 +78,7 @@ class MainViewModel @Inject constructor(
                                 videoFrame = uriWithData.third
                             )
                         }
-                        videoItems = videoUris.map { uris ->
-                            uris.map { uriWithData ->
-                                VideoItem(
-                                    contentUri = uriWithData.second,
-                                    mediaItem = MediaItem.fromUri(uriWithData.second),
-                                    name = uriWithData.first
-                                        ?: metadataReader.getMetadataFromUri(uriWithData.second)?.fileName
-                                        ?: "No name",
-                                    videoFrame = uriWithData.third
-                                )
-                            }
-                        }.stateIn(
-                            viewModelScope,
-                            SharingStarted.WhileSubscribed(5000),
-                            defaultValue
-                        )
+                        videoItems = newValue
                     }
                 }
                 }
@@ -133,7 +88,7 @@ class MainViewModel @Inject constructor(
 
     fun playVideo(uri: Uri) {
         player.setMediaItem(
-            videoItems.value.find { it.contentUri == uri }?.mediaItem ?: return
+            videoItems.find { it.contentUri == uri }?.mediaItem ?: return
         )
     }
 
