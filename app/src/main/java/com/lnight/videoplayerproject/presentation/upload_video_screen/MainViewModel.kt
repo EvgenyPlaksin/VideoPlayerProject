@@ -32,56 +32,43 @@ class MainViewModel @Inject constructor(
     private val app: Application
 ): AndroidViewModel(app) {
 
-    private val videoUris = MutableStateFlow<List<Triple<String?, Uri, ImageBitmap?>>>(emptyList())
+    private val videoUris = MutableStateFlow<Set<Triple<String?, Uri, ImageBitmap?>>>(emptySet())
 
-    var videoItems by mutableStateOf<List<VideoItem>>(emptyList())
+    var videoItems by mutableStateOf<Set<VideoItem>>(emptySet())
         private set
 
     init {
         player.prepare()
     }
 
-    fun addVideoUri(urisWithData: List<Pair<String?, Uri?>>, singleMode: Boolean = false) {
+    fun addVideoUri(urisWithData: List<Pair<String?, Uri?>>) {
         viewModelScope.launch {
-            if(!singleMode) {
-                videoUris.value = emptyList()
-                videoItems = emptyList()
-            }
             urisWithData.forEach {
                 if(it.second != null) {
                 val bitmap = getFrameAsBitmap(it.second!!)
-                if (!videoUris.value.contains(Triple(it.first, it.second, bitmap))) {
+                if (videoUris.value.find { it1 -> it1.second == it.second } == null) {
                     videoUris.value = videoUris.value + Triple(it.first, it.second!!, bitmap)
-                    val newValue = videoUris.value.map { uriWithData ->
-                        VideoItem(
-                            contentUri = uriWithData.second,
-                            mediaItem = MediaItem.fromUri(uriWithData.second),
-                            name = uriWithData.first
-                                ?: metadataReader.getMetadataFromUri(uriWithData.second)?.fileName
-                                ?: "No name",
-                            videoFrame = uriWithData.third
-                        )
-                    }
-                    videoItems = newValue
                     player.addMediaItem(MediaItem.fromUri(it.second!!))
                 }
-                videoUris.value.forEach { u ->
-                    if (!File(u.second.toString()).exists()) {
-                        videoUris.value = videoUris.value - Triple(u.first, u.second, u.third)
-                        val newValue = videoUris.value.map { uriWithData ->
-                            VideoItem(
-                                contentUri = uriWithData.second,
-                                mediaItem = MediaItem.fromUri(uriWithData.second),
-                                name = uriWithData.first
-                                    ?: metadataReader.getMetadataFromUri(uriWithData.second)?.fileName
-                                    ?: "No name",
-                                videoFrame = uriWithData.third
-                            )
+                    videoUris.value.forEach { u ->
+                        if (!File(u.second.toString()).exists() && u.second.scheme != "content") {
+                            videoUris.value = videoUris.value - Triple(u.first, u.second, u.third)
                         }
-                        videoItems = newValue
                     }
+                  updateItems()
                 }
-                }
+            }
+        }
+    }
+
+    fun addSingleVideo(uri: Uri) {
+        viewModelScope.launch {
+            val name = metadataReader.getMetadataFromUri(uri)?.fileName
+            val bitmap = getFrameAsBitmap(uri, false)
+
+            if(!videoUris.value.contains(Triple(name, uri, bitmap))) {
+                videoUris.value = videoUris.value + Triple(name, uri, bitmap)
+                updateItems()
             }
         }
     }
@@ -92,13 +79,27 @@ class MainViewModel @Inject constructor(
         )
     }
 
-    private suspend fun getFrameAsBitmap(uri: Uri): ImageBitmap? {
+    private fun updateItems() {
+                val newValue = videoUris.value.map { uriWithData ->
+                    VideoItem(
+                        contentUri = uriWithData.second,
+                        mediaItem = MediaItem.fromUri(uriWithData.second),
+                        name = uriWithData.first
+                            ?: metadataReader.getMetadataFromUri(uriWithData.second)?.fileName
+                            ?: "No name",
+                        videoFrame = uriWithData.third
+                    )
+                }.toSet()
+                videoItems = newValue
+    }
+
+    private suspend fun getFrameAsBitmap(uri: Uri, needFile: Boolean = true): ImageBitmap? {
         return try {
             val options = RequestOptions().frame(5000000L)
             val file = File(uri.toString())
             withContext(Dispatchers.IO) {
                 Glide.with(app).asBitmap()
-                    .load(file.absolutePath)
+                    .load(if(needFile) file.absolutePath else uri)
                     .apply(options)
                     .skipMemoryCache(false)
                     .placeholder(R.drawable.ic_loading)

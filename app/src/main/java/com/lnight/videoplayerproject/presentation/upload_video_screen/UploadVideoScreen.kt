@@ -10,7 +10,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FileOpen
@@ -59,9 +58,7 @@ fun UploadVideoScreen(
     val selectVideoLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
         onResult = { uri ->
-            uri?.let {
-                viewModel.addVideoUri(listOf(Pair(null, uri)), true)
-            }
+            uri?.let(viewModel::addSingleVideo)
         }
     )
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -80,12 +77,12 @@ fun UploadVideoScreen(
     }
 
     when {
-        !permissionState.status.isGranted && permissionState.status.shouldShowRationale -> {
+        !permissionState.status.isGranted && !permissionState.status.shouldShowRationale -> {
             LaunchedEffect(key1 = true) {
                 permissionState.launchPermissionRequest()
             }
         }
-        !permissionState.status.isGranted && !permissionState.status.shouldShowRationale  -> {
+        !permissionState.status.isGranted && permissionState.status.shouldShowRationale  -> {
                 val snackbarHostState = remember { SnackbarHostState() }
                 val scope = rememberCoroutineScope()
                 Scaffold(
@@ -110,8 +107,6 @@ fun UploadVideoScreen(
                 )
         }
     }
-
-
 
     Column(
         modifier = Modifier.fillMaxSize()
@@ -148,7 +143,8 @@ fun UploadVideoScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp)
         ) {
-            items(videoItems) { item ->
+            items(videoItems.size) { index ->
+                val item = videoItems.elementAt(index)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -183,6 +179,7 @@ fun UploadVideoScreen(
                         fontSize = 20.sp,
                         color = MaterialTheme.colorScheme.secondary
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
                 }
                 Spacer(modifier = Modifier.height(15.dp))
             }
