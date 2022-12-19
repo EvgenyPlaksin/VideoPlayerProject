@@ -8,9 +8,9 @@ A simple project representing the use of the [Exoplayer library](https://github.
 - **Video player library** - [Exoplayer](https://github.com/google/ExoPlayer)
 
 ### Screenshots
-<img src="https://user-images.githubusercontent.com/94696816/208308971-2f876419-69f7-49f2-bac6-c7feb5e93e4a.png" width="200" height="400" />
+<img src="https://user-images.githubusercontent.com/94696816/208444768-a0fd129f-6387-4453-a1e8-f9870c6566aa.png" width="200" height="400" />
 
-<img src="https://user-images.githubusercontent.com/94696816/208308975-6a9e17fa-e405-44a5-a7fe-c5647c1b4df4.png" width="200" height="400" />
+<img src="https://user-images.githubusercontent.com/94696816/208444792-2b462d98-5d59-4e49-98fe-6f61f4fb9fd9.png" width="200" height="400" />
 
 <img src="https://user-images.githubusercontent.com/94696816/207915258-43d902fd-4e3b-47b8-9d52-1b242f4d8745.png" width="200" height="400" />
 
