@@ -14,7 +14,7 @@ import androidx.media3.common.Player
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
 import com.lnight.videoplayerproject.R
-import com.lnight.videoplayerproject.presentation.MetadataReader
+import com.lnight.videoplayerproject.data.metadata_reader.MetadataReader
 import com.lnight.videoplayerproject.presentation.VideoItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers

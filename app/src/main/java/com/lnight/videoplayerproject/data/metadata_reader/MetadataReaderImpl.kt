@@ -1,16 +1,8 @@
-package com.lnight.videoplayerproject.presentation
+package com.lnight.videoplayerproject.data.metadata_reader
 
 import android.app.Application
 import android.net.Uri
 import android.provider.MediaStore
-
-data class Metadata(
-    val fileName: String
-)
-
-interface MetadataReader {
-    fun getMetadataFromUri(contentUri: Uri): Metadata?
-}
 
 class MetadataReaderImpl(
     private val app: Application

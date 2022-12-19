@@ -94,5 +94,12 @@ dependencies {
     implementation 'com.github.bumptech.glide:glide:4.14.2'
     kapt 'com.github.bumptech.glide:compiler:4.14.2'
 
+    // Accompanist
     implementation "com.google.accompanist:accompanist-permissions:0.28.0"
+
+    // WorkManager with Coroutines
+    implementation "androidx.work:work-runtime-ktx:2.7.1"
+
+    // Retrofit
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
 }
