@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -54,6 +55,8 @@ fun UploadVideoScreen(
         )
     }
     val videoItems = viewModel.videoItems
+    val userVideoItems = viewModel.userVideoItems
+
     val context = LocalContext.current
     val selectVideoLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
@@ -143,8 +146,74 @@ fun UploadVideoScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp)
         ) {
+            if(videoItems.isNotEmpty()) {
+                item {
+                    Text(
+                        text = "All video files",
+                        fontSize = 20.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(5.dp))
+                }
+            }
             items(videoItems.size) { index ->
                 val item = videoItems.elementAt(index)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            BorderStroke(
+                                width = 0.8.dp,
+                                color = MaterialTheme.colorScheme.secondaryContainer
+                            ),
+                            shape = RoundedCornerShape(6.dp)
+                        )
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable {
+                            navController.navigate("video_player_screen")
+                            viewModel.playVideo(item.contentUri)
+                        },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if(item.videoFrame != null) {
+                        Image(
+                            contentScale = ContentScale.FillBounds,
+                            bitmap = item.videoFrame,
+                            contentDescription = "file Image",
+                            modifier = Modifier
+                                .size(width = 110.dp, height = 90.dp)
+                                .clip(RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp))
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Text(
+                        text = item.name,
+                        fontSize = 20.sp,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Spacer(modifier = Modifier.height(15.dp))
+            }
+            if(userVideoItems.isNotEmpty()) {
+                item {
+                    Text(
+                        text = "Your own uploads",
+                        fontSize = 20.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(5.dp))
+                }
+            }
+            items(userVideoItems.size) { index ->
+                val item = userVideoItems.elementAt(index)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

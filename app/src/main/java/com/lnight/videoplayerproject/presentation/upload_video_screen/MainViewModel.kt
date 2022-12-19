@@ -37,6 +37,9 @@ class MainViewModel @Inject constructor(
     var videoItems by mutableStateOf<Set<VideoItem>>(emptySet())
         private set
 
+    var userVideoItems by mutableStateOf<Set<VideoItem>>(emptySet())
+        private set
+
     init {
         player.prepare()
     }
@@ -63,13 +66,15 @@ class MainViewModel @Inject constructor(
 
     fun addSingleVideo(uri: Uri) {
         viewModelScope.launch {
-            val name = metadataReader.getMetadataFromUri(uri)?.fileName
+            val name = metadataReader.getMetadataFromUri(uri)?.fileName ?: "No name"
             val bitmap = getFrameAsBitmap(uri, false)
 
-            if(!videoUris.value.contains(Triple(name, uri, bitmap))) {
-                videoUris.value = videoUris.value + Triple(name, uri, bitmap)
-                updateItems()
-            }
+            userVideoItems = userVideoItems + VideoItem(
+                contentUri = uri,
+                mediaItem = MediaItem.fromUri(uri),
+                name = name,
+                videoFrame = bitmap
+            )
         }
     }
 
