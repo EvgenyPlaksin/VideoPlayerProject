@@ -4,13 +4,12 @@ import android.annotation.SuppressLint
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material3.*
@@ -28,7 +27,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.navigation.NavController
+import androidx.work.*
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
@@ -38,7 +39,9 @@ import com.lnight.videoplayerproject.common.openAppDetails
 import kotlinx.coroutines.launch
 
 
-@OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class,
+    ExperimentalMaterialApi::class
+)
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun UploadVideoScreen(
@@ -79,6 +82,34 @@ fun UploadVideoScreen(
         }
     }
 
+    val downloadRequest = OneTimeWorkRequestBuilder<DownloadVideoWorker>()
+        .setConstraints(
+            Constraints.Builder()
+                .setRequiredNetworkType(
+                    NetworkType.CONNECTED
+                )
+                .build()
+        )
+        .build()
+    val workManager = WorkManager.getInstance(context)
+
+    val workInfos = workManager
+        .getWorkInfosForUniqueWorkLiveData("download")
+        .observeAsState()
+        .value
+    val downloadInfo = remember(key1 = workInfos) {
+        workInfos?.find { it.id == downloadRequest.id }
+    }
+    var showDialog by remember {
+        mutableStateOf(false)
+    }
+
+    var showEdittext by remember {
+        mutableStateOf(false)
+    }
+
+    RequestNotificationsPermission()
+
     when {
         !permissionState.status.isGranted && !permissionState.status.shouldShowRationale -> {
             LaunchedEffect(key1 = true) {
@@ -110,6 +141,91 @@ fun UploadVideoScreen(
                 )
         }
     }
+    if(showDialog) {
+        AlertDialog(
+            onDismissRequest = {
+               showDialog = false
+            },
+            confirmButton = {
+               Button(onClick = {
+                   selectVideoLauncher.launch("video/*")
+                   showDialog = false
+               }) {
+                   Text(
+                       text = "select video from storage",
+                       fontSize = 15.sp,
+                       color = MaterialTheme.colorScheme.onPrimary
+                   )
+               }
+            },
+            dismissButton = {
+                Button(onClick = {
+                    showEdittext = true
+                    showDialog = false
+                }) {
+                    Text(
+                        text = "download video from url",
+                        fontSize = 15.sp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+            }
+        )
+    }
+    var text by remember { mutableStateOf("") }
+
+    if (showEdittext) {
+        AlertDialog(
+            onDismissRequest = {
+                showEdittext = false
+            },
+            title = {
+                Text(text = "Enter video url")
+            },
+            text = {
+                Column {
+                    TextField(
+                        value = text,
+                        onValueChange = { text = it }
+                    )
+                }
+            },
+            confirmButton = {
+                Column(
+                    modifier = Modifier.padding(all = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = {
+                            workManager
+                                .beginUniqueWork(
+                                    "download",
+                                    ExistingWorkPolicy.KEEP,
+                                    downloadRequest
+                                )
+                                .enqueue()
+                            text = ""
+                            showEdittext = false
+                        }
+                    ) {
+                        Text("Submit")
+                    }
+
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = {
+                            text = ""
+                            showEdittext = false
+                        }
+                    ) {
+                        Text("Dismiss")
+                    }
+                }
+            }
+
+        )
+    }
 
     Column(
         modifier = Modifier.fillMaxSize()
@@ -127,7 +243,9 @@ fun UploadVideoScreen(
         Spacer(modifier = Modifier.height(20.dp))
         
         IconButton(
-            onClick = { selectVideoLauncher.launch("video/*") },
+            onClick = {
+               showDialog = true
+            },
             modifier = Modifier
                 .align(Alignment.CenterHorizontally)
         ) {
@@ -251,6 +369,31 @@ fun UploadVideoScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                 }
                 Spacer(modifier = Modifier.height(15.dp))
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalPermissionsApi::class)
+@Composable
+private fun RequestNotificationsPermission(
+    lifecycleOwner: LifecycleOwner = LocalLifecycleOwner.current,
+) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        val permissionState = rememberPermissionState(
+            android.Manifest.permission.POST_NOTIFICATIONS
+        )
+        if (!permissionState.status.isGranted) {
+            DisposableEffect(lifecycleOwner) {
+                val observer = LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_START) {
+                        permissionState.launchPermissionRequest()
+                    }
+                }
+                lifecycleOwner.lifecycle.addObserver(observer)
+                onDispose {
+                    lifecycleOwner.lifecycle.removeObserver(observer)
+                }
             }
         }
     }
