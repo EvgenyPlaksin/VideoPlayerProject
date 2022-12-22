@@ -25,36 +25,37 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.LifecycleOwner
 import androidx.navigation.NavController
 import androidx.work.*
-import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.isGranted
-import com.google.accompanist.permissions.rememberPermissionState
-import com.google.accompanist.permissions.shouldShowRationale
+import com.google.accompanist.permissions.*
 import com.lnight.videoplayerproject.common.WorkerKeys
 import com.lnight.videoplayerproject.common.getVideoPath
 import com.lnight.videoplayerproject.common.openAppDetails
 import kotlinx.coroutines.launch
-import kotlin.random.Random
-
 
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun UploadVideoScreen(
     navController: NavController,
-    viewModel: MainViewModel
+    viewModel: MainViewModel,
+    first: Boolean
 ) {
     val permissionState = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        rememberPermissionState(
-            android.Manifest.permission.READ_MEDIA_VIDEO
+        rememberMultiplePermissionsState(
+            listOf(
+                android.Manifest.permission.READ_MEDIA_VIDEO,
+                android.Manifest.permission.POST_NOTIFICATIONS
+            )
         )
     } else {
-        rememberPermissionState(
-            android.Manifest.permission.READ_EXTERNAL_STORAGE
+        rememberMultiplePermissionsState(
+            listOf(
+                android.Manifest.permission.READ_EXTERNAL_STORAGE
+            )
         )
     }
     val videoItems = viewModel.videoItems
@@ -70,7 +71,7 @@ fun UploadVideoScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(key1 = lifecycleOwner, key2 = permissionState) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME && permissionState.status.isGranted) {
+            if (event == Lifecycle.Event.ON_RESUME && permissionState.permissions.first().status.isGranted) {
                 val urisWithData = context.getVideoPath()
                 viewModel.addVideoUri(urisWithData)
             }
@@ -81,9 +82,7 @@ fun UploadVideoScreen(
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
-    val tag by remember {
-        mutableStateOf(Random.nextInt())
-    }
+
     val downloadRequest = OneTimeWorkRequestBuilder<DownloadVideoWorker>()
         .setConstraints(
             Constraints.Builder()
@@ -92,16 +91,16 @@ fun UploadVideoScreen(
                 )
                 .build()
         )
-        .addTag(tag.toString())
+        .addTag("DownloadTag")
     val workManager = WorkManager.getInstance(context)
 
-    val workInfos = workManager
-        .getWorkInfosByTagLiveData(tag.toString())
+    val workInfo = workManager
+        .getWorkInfosByTagLiveData("DownloadTag")
         .observeAsState()
         .value
 
-    val downloadInfo: WorkInfo? = remember(key1 = workInfos) {
-        workInfos?.firstOrNull()
+    val downloadInfo: WorkInfo? = remember(key1 = workInfo) {
+        workInfo?.firstOrNull()
     }
     var showDialog by remember {
         mutableStateOf(false)
@@ -114,76 +113,78 @@ fun UploadVideoScreen(
         mutableStateOf(false)
     }
 
-    RequestNotificationsPermission()
-
-    when {
-        !permissionState.status.isGranted && !permissionState.status.shouldShowRationale -> {
-            DisposableEffect(key1 = lifecycleOwner) {
-                val observer = LifecycleEventObserver { _, event ->
-                    if (event == Lifecycle.Event.ON_START) {
-                        permissionState.launchPermissionRequest()
-                    }
+    var showSnackbar by remember {
+        mutableStateOf(false)
+    }
+    DisposableEffect(key1 = lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START) {
+                if (permissionState.permissions.first().status.shouldShowRationale && permissionState.permissions.size > 2) {
+                    permissionState.permissions[1].launchPermissionRequest()
+                } else if (!permissionState.permissions.first().status.shouldShowRationale) {
+                    permissionState.launchMultiplePermissionRequest()
                 }
-                lifecycleOwner.lifecycle.addObserver(observer)
-
-                onDispose {
-                    lifecycleOwner.lifecycle.removeObserver(observer)
-                }
-
             }
         }
-        !permissionState.status.isGranted && permissionState.status.shouldShowRationale -> {
-            val snackbarHostState = remember { SnackbarHostState() }
-            val scope = rememberCoroutineScope()
-            Scaffold(
-                modifier = Modifier.fillMaxSize(),
-                snackbarHost = { SnackbarHost(snackbarHostState) },
-                content = {
-                    LaunchedEffect(key1 = true) {
-                        scope.launch {
-                            val result = snackbarHostState.showSnackbar(
-                                message = "We can't show you all your files without permission",
-                                actionLabel = "Give permission"
-                            )
-                            when (result) {
-                                Dismissed -> Unit
-                                ActionPerformed -> {
-                                    context.openAppDetails()
-                                }
-                            }
-                        }
-                    }
-                }
-            )
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
+
     }
+
+    LaunchedEffect(key1 = permissionState) {
+        showSnackbar = !permissionState.permissions.first().status.isGranted
+    }
+
     if (showDialog) {
         AlertDialog(
             onDismissRequest = {
                 showDialog = false
             },
             confirmButton = {
-                Button(onClick = {
-                    selectVideoLauncher.launch("video/*")
-                    showDialog = false
-                }) {
+                Column {
+
                     Text(
-                        text = "select video from storage",
-                        fontSize = 15.sp,
-                        color = MaterialTheme.colorScheme.onPrimary
+                        text = "Choose where to get the video from",
+                        fontSize = 20.sp,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
                     )
-                }
-            },
-            dismissButton = {
-                Button(onClick = {
-                    showEdittext = true
-                    showDialog = false
-                }) {
-                    Text(
-                        text = "download video from url",
-                        fontSize = 15.sp,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Button(
+                        onClick = {
+                            selectVideoLauncher.launch("video/*")
+                            showDialog = false
+                        },
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    ) {
+                        Text(
+                            text = "select video from storage",
+                            fontSize = 15.sp,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(5.dp))
+
+                    Button(
+                        onClick = {
+                            showEdittext = true
+                            showDialog = false
+                        },
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    ) {
+                        Text(
+                            text = "download video from url",
+                            fontSize = 15.sp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
                 }
             }
         )
@@ -226,7 +227,6 @@ fun UploadVideoScreen(
                                     work
                                 )
                                 .enqueue()
-                            Log.e("TAG", "info -> ${downloadInfo?.state?.name}")
                             text = ""
                             showEdittext = false
                             start = true
@@ -262,11 +262,40 @@ fun UploadVideoScreen(
                 scope.launch {
                     snackbarHostState.showSnackbar(
                         message = downloadInfo.outputData.getString(WorkerKeys.ERROR_MSG)
-                            ?: "Download failed, try again later",
+                            ?: "Download failed, try again later"
                     )
+                }
+                workManager.pruneWork()
+            } else if (downloadInfo?.state == WorkInfo.State.SUCCEEDED) {
+                val localUri = downloadInfo.outputData.getString(WorkerKeys.LOCAL_VIDEO_URI)
+                if (localUri != null) {
+                    Log.e("TAG", localUri)
+                    viewModel.addSingleVideo(localUri.toUri())
+                }
+                workManager.pruneWork()
+            }
+        }
+
+        LaunchedEffect(key1 = showSnackbar) {
+            if (showSnackbar && !first) {
+                val result = snackbarHostState.showSnackbar(
+                    message = if (permissionState.permissions.first().status.shouldShowRationale) "We can't show you all your files without permission" else "Permission fully denied. Go to settings to give permission",
+                    actionLabel = "Give permission",
+                    duration = SnackbarDuration.Long
+                )
+                showSnackbar = when (result) {
+                    Dismissed -> {
+                        false
+                    }
+                    ActionPerformed -> {
+                        if (permissionState.permissions.first().status.shouldShowRationale) permissionState.permissions.first()
+                            .launchPermissionRequest() else context.openAppDetails()
+                        false
+                    }
                 }
             }
         }
+
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
@@ -412,34 +441,17 @@ fun UploadVideoScreen(
                 }
                 if (downloadInfo?.state == WorkInfo.State.RUNNING) {
                     item {
-                        CircularProgressIndicator()
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier
+                                    .size(60.dp)
+                                    .clip(RoundedCornerShape(8f))
+                            )
+                        }
                     }
-                }
-            }
-        }
-    }
-}
-
-
-@ExperimentalPermissionsApi
-@Composable
-private fun RequestNotificationsPermission(
-    lifecycleOwner: LifecycleOwner = LocalLifecycleOwner.current,
-) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        val permissionState = rememberPermissionState(
-            android.Manifest.permission.POST_NOTIFICATIONS
-        )
-        if (!permissionState.status.isGranted) {
-            DisposableEffect(lifecycleOwner) {
-                val observer = LifecycleEventObserver { _, event ->
-                    if (event == Lifecycle.Event.ON_START) {
-                        permissionState.launchPermissionRequest()
-                    }
-                }
-                lifecycleOwner.lifecycle.addObserver(observer)
-                onDispose {
-                    lifecycleOwner.lifecycle.removeObserver(observer)
                 }
             }
         }

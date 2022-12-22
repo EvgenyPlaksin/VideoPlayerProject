@@ -3,6 +3,7 @@ package com.lnight.videoplayerproject.presentation.upload_video_screen
 import android.content.Context
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
@@ -42,10 +43,12 @@ class DownloadVideoWorker @AssistedInject constructor(
                     response.body()?.let { body ->
                         return withContext(Dispatchers.IO) {
                             try {
-                                val fileName = videoUri.substring(videoUri.lastIndexOf("/")+1)
-                                val pathToSave = context.filesDir.absolutePath+fileName
+                                val fileName = videoUri.substring(videoUri.lastIndexOf("/") + 1)
+                                val pathToSave = context.filesDir.absolutePath + fileName
                                 uri = saveFile(body, pathToSave)
                             } catch (e: IOException) {
+                                val notificationManager = NotificationManagerCompat.from(context)
+                                notificationManager.cancelAll()
                                 return@withContext Result.failure(
                                     workDataOf(
                                         WorkerKeys.ERROR_MSG to e.localizedMessage
@@ -53,6 +56,8 @@ class DownloadVideoWorker @AssistedInject constructor(
                                 )
                             }
                             Log.e("TAG", "uri -> $uri")
+                            val notificationManager = NotificationManagerCompat.from(context)
+                            notificationManager.cancelAll()
                             Result.success(
                                 workDataOf(
                                     WorkerKeys.LOCAL_VIDEO_URI to uri
@@ -62,6 +67,8 @@ class DownloadVideoWorker @AssistedInject constructor(
                     }
                 }
                 false -> {
+                    val notificationManager = NotificationManagerCompat.from(context)
+                    notificationManager.cancelAll()
                     if (response.code().toString().startsWith("5")) {
                         return Result.retry()
                     }
@@ -73,12 +80,16 @@ class DownloadVideoWorker @AssistedInject constructor(
                 }
             }
         } catch (e: Exception) {
+            val notificationManager = NotificationManagerCompat.from(context)
+            notificationManager.cancelAll()
             return Result.failure(
                 workDataOf(
                     WorkerKeys.ERROR_MSG to "Network error"
                 )
             )
         }
+        val notificationManager = NotificationManagerCompat.from(context)
+        notificationManager.cancelAll()
         return Result.failure(
             workDataOf(
                 WorkerKeys.ERROR_MSG to "Unknown error"
@@ -91,9 +102,10 @@ class DownloadVideoWorker @AssistedInject constructor(
             ForegroundInfo(
                 Random.nextInt(),
                 NotificationCompat.Builder(context,"download_channel")
-                    .setSmallIcon(R.drawable.ic_launcher_foreground)
+                    .setSmallIcon(R.drawable.ic_download)
                     .setContentText("Downloading")
                     .setContentTitle("Download in progress")
+                    .setOngoing(true)
                     .build()
             )
         )

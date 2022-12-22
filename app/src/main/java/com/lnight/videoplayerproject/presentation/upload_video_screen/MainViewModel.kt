@@ -24,7 +24,6 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
 
-
 @HiltViewModel
 class MainViewModel @Inject constructor(
     val player: Player,
@@ -107,7 +106,7 @@ class MainViewModel @Inject constructor(
                     .load(if(needFile) file.absolutePath else uri)
                     .apply(options)
                     .skipMemoryCache(false)
-                    .placeholder(R.drawable.ic_loading)
+                    .placeholder(R.drawable.ic_download)
                     .submit().get()
             }.asImageBitmap()
         } catch (e: Exception) {

@@ -1,5 +1,6 @@
 package com.lnight.videoplayerproject.presentation
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -22,6 +23,7 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val sharedPref = getSharedPreferences("firstPref", Context.MODE_PRIVATE)
         setContent {
             VideoPlayerProjectTheme {
                 val viewModel = hiltViewModel<MainViewModel>()
@@ -36,8 +38,10 @@ class MainActivity : ComponentActivity() {
                         composable("upload_video_screen") {
                             UploadVideoScreen(
                                 navController = navController,
-                                viewModel = viewModel
+                                viewModel = viewModel,
+                                sharedPref.getBoolean("first", true)
                             )
+                            sharedPref.edit().putBoolean("first", false).apply()
                         }
                         composable("video_player_screen") {
                             VideoPlayerScreen(
