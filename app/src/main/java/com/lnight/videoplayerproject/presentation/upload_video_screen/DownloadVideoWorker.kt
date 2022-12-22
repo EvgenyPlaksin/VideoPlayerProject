@@ -29,6 +29,7 @@ class DownloadVideoWorker @AssistedInject constructor(
 ): CoroutineWorker(appContext = context, params = params) {
 
     override suspend fun doWork(): Result {
+        Log.e("TAG", "doWork")
         startForegroundService()
         try {
             val videoUri =
@@ -51,6 +52,7 @@ class DownloadVideoWorker @AssistedInject constructor(
                                     )
                                 )
                             }
+                            Log.e("TAG", "uri -> $uri")
                             Result.success(
                                 workDataOf(
                                     WorkerKeys.LOCAL_VIDEO_URI to uri

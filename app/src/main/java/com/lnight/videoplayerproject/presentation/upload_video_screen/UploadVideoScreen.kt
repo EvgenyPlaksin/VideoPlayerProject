@@ -2,19 +2,19 @@ package com.lnight.videoplayerproject.presentation.upload_video_screen
 
 import android.annotation.SuppressLint
 import android.os.Build
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material3.*
 import androidx.compose.material3.SnackbarResult.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,14 +34,14 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.google.accompanist.permissions.shouldShowRationale
+import com.lnight.videoplayerproject.common.WorkerKeys
 import com.lnight.videoplayerproject.common.getVideoPath
 import com.lnight.videoplayerproject.common.openAppDetails
 import kotlinx.coroutines.launch
+import kotlin.random.Random
 
 
-@OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class,
-    ExperimentalMaterialApi::class
-)
+@OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun UploadVideoScreen(
@@ -70,7 +70,7 @@ fun UploadVideoScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(key1 = lifecycleOwner, key2 = permissionState) {
         val observer = LifecycleEventObserver { _, event ->
-            if(event == Lifecycle.Event.ON_RESUME && permissionState.status.isGranted) {
+            if (event == Lifecycle.Event.ON_RESUME && permissionState.status.isGranted) {
                 val urisWithData = context.getVideoPath()
                 viewModel.addVideoUri(urisWithData)
             }
@@ -81,7 +81,9 @@ fun UploadVideoScreen(
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
-
+    val tag by remember {
+        mutableStateOf(Random.nextInt())
+    }
     val downloadRequest = OneTimeWorkRequestBuilder<DownloadVideoWorker>()
         .setConstraints(
             Constraints.Builder()
@@ -90,15 +92,16 @@ fun UploadVideoScreen(
                 )
                 .build()
         )
-        .build()
+        .addTag(tag.toString())
     val workManager = WorkManager.getInstance(context)
 
     val workInfos = workManager
-        .getWorkInfosForUniqueWorkLiveData("download")
+        .getWorkInfosByTagLiveData(tag.toString())
         .observeAsState()
         .value
-    val downloadInfo = remember(key1 = workInfos) {
-        workInfos?.find { it.id == downloadRequest.id }
+
+    val downloadInfo: WorkInfo? = remember(key1 = workInfos) {
+        workInfos?.firstOrNull()
     }
     var showDialog by remember {
         mutableStateOf(false)
@@ -107,56 +110,69 @@ fun UploadVideoScreen(
     var showEdittext by remember {
         mutableStateOf(false)
     }
+    var start by remember {
+        mutableStateOf(false)
+    }
 
     RequestNotificationsPermission()
 
     when {
         !permissionState.status.isGranted && !permissionState.status.shouldShowRationale -> {
-            LaunchedEffect(key1 = true) {
-                permissionState.launchPermissionRequest()
+            DisposableEffect(key1 = lifecycleOwner) {
+                val observer = LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_START) {
+                        permissionState.launchPermissionRequest()
+                    }
+                }
+                lifecycleOwner.lifecycle.addObserver(observer)
+
+                onDispose {
+                    lifecycleOwner.lifecycle.removeObserver(observer)
+                }
+
             }
         }
-        !permissionState.status.isGranted && permissionState.status.shouldShowRationale  -> {
-                val snackbarHostState = remember { SnackbarHostState() }
-                val scope = rememberCoroutineScope()
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    snackbarHost = { SnackbarHost(snackbarHostState) },
-                    content = {
-                        LaunchedEffect(key1 = true) {
-                            scope.launch {
-                                val result = snackbarHostState.showSnackbar(
-                                    message = "We can't show you all your files without permission",
-                                    actionLabel = "Give permission"
-                                )
-                                when (result) {
-                                    Dismissed -> Unit
-                                    ActionPerformed ->  {
-                                        context.openAppDetails()
-                                    }
+        !permissionState.status.isGranted && permissionState.status.shouldShowRationale -> {
+            val snackbarHostState = remember { SnackbarHostState() }
+            val scope = rememberCoroutineScope()
+            Scaffold(
+                modifier = Modifier.fillMaxSize(),
+                snackbarHost = { SnackbarHost(snackbarHostState) },
+                content = {
+                    LaunchedEffect(key1 = true) {
+                        scope.launch {
+                            val result = snackbarHostState.showSnackbar(
+                                message = "We can't show you all your files without permission",
+                                actionLabel = "Give permission"
+                            )
+                            when (result) {
+                                Dismissed -> Unit
+                                ActionPerformed -> {
+                                    context.openAppDetails()
                                 }
                             }
                         }
                     }
-                )
+                }
+            )
         }
     }
-    if(showDialog) {
+    if (showDialog) {
         AlertDialog(
             onDismissRequest = {
-               showDialog = false
+                showDialog = false
             },
             confirmButton = {
-               Button(onClick = {
-                   selectVideoLauncher.launch("video/*")
-                   showDialog = false
-               }) {
-                   Text(
-                       text = "select video from storage",
-                       fontSize = 15.sp,
-                       color = MaterialTheme.colorScheme.onPrimary
-                   )
-               }
+                Button(onClick = {
+                    selectVideoLauncher.launch("video/*")
+                    showDialog = false
+                }) {
+                    Text(
+                        text = "select video from storage",
+                        fontSize = 15.sp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
             },
             dismissButton = {
                 Button(onClick = {
@@ -198,15 +214,22 @@ fun UploadVideoScreen(
                     Button(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = {
+                            val data = Data.Builder()
+                                .putString(WorkerKeys.VIDEO_URI, text)
+                                .build()
+                            downloadRequest.setInputData(data)
+                            val work = downloadRequest.build()
                             workManager
                                 .beginUniqueWork(
                                     "download",
                                     ExistingWorkPolicy.KEEP,
-                                    downloadRequest
+                                    work
                                 )
                                 .enqueue()
+                            Log.e("TAG", "info -> ${downloadInfo?.state?.name}")
                             text = ""
                             showEdittext = false
+                            start = true
                         }
                     ) {
                         Text("Submit")
@@ -227,154 +250,178 @@ fun UploadVideoScreen(
         )
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) {
-        Spacer(modifier = Modifier.height(35.dp))
-
-        Text(
-            text = "Add video to watch!",
-            fontSize = 30.sp,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.fillMaxWidth(),
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-        
-        IconButton(
-            onClick = {
-               showDialog = true
-            },
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-        ) {
-            Icon(
-                imageVector = Icons.Default.FileOpen,
-                contentDescription = "select video",
-                modifier = Modifier.size(200.dp),
-                tint = MaterialTheme.colorScheme.secondary
-            )
+        LaunchedEffect(key1 = downloadInfo) {
+            if (downloadInfo?.state == WorkInfo.State.FAILED) {
+                scope.launch {
+                    snackbarHostState.showSnackbar(
+                        message = downloadInfo.outputData.getString(WorkerKeys.ERROR_MSG)
+                            ?: "Download failed, try again later",
+                    )
+                }
+            }
         }
-
-        Spacer(modifier = Modifier.height(30.dp))
-
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp)
+        Column(
+            modifier = Modifier.fillMaxSize()
         ) {
-            if(videoItems.isNotEmpty()) {
-                item {
-                    Text(
-                        text = "All video files",
-                        fontSize = 20.sp,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Spacer(modifier = Modifier.height(5.dp))
-                }
+            Spacer(modifier = Modifier.height(35.dp))
+
+            Text(
+                text = "Add video to watch!",
+                fontSize = 30.sp,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            IconButton(
+                onClick = {
+                    showDialog = true
+                },
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.FileOpen,
+                    contentDescription = "select video",
+                    modifier = Modifier.size(200.dp),
+                    tint = MaterialTheme.colorScheme.secondary
+                )
             }
-            items(videoItems.size) { index ->
-                val item = videoItems.elementAt(index)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(
-                            BorderStroke(
-                                width = 0.8.dp,
-                                color = MaterialTheme.colorScheme.secondaryContainer
-                            ),
-                            shape = RoundedCornerShape(6.dp)
+
+            Spacer(modifier = Modifier.height(30.dp))
+
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+            ) {
+                if (videoItems.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "All video files",
+                            fontSize = 20.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center,
+                            fontWeight = FontWeight.SemiBold
                         )
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable {
-                            navController.navigate("video_player_screen")
-                            viewModel.playVideo(item.contentUri)
-                        },
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if(item.videoFrame != null) {
-                        Image(
-                            contentScale = ContentScale.FillBounds,
-                            bitmap = item.videoFrame,
-                            contentDescription = "file Image",
-                            modifier = Modifier
-                                .size(width = 110.dp, height = 90.dp)
-                                .clip(RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp))
+                        Spacer(modifier = Modifier.height(5.dp))
+                    }
+                }
+                items(videoItems.size) { index ->
+                    val item = videoItems.elementAt(index)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(
+                                BorderStroke(
+                                    width = 0.8.dp,
+                                    color = MaterialTheme.colorScheme.secondaryContainer
+                                ),
+                                shape = RoundedCornerShape(6.dp)
+                            )
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable {
+                                navController.navigate("video_player_screen")
+                                viewModel.playVideo(item.contentUri)
+                            },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (item.videoFrame != null) {
+                            Image(
+                                contentScale = ContentScale.FillBounds,
+                                bitmap = item.videoFrame,
+                                contentDescription = "file Image",
+                                modifier = Modifier
+                                    .size(width = 110.dp, height = 90.dp)
+                                    .clip(RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp))
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(
+                            text = item.name,
+                            fontSize = 20.sp,
+                            color = MaterialTheme.colorScheme.secondary
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                     }
-                    Text(
-                        text = item.name,
-                        fontSize = 20.sp,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.height(15.dp))
                 }
-                Spacer(modifier = Modifier.height(15.dp))
-            }
-            if(userVideoItems.isNotEmpty()) {
-                item {
-                    Text(
-                        text = "Your own uploads",
-                        fontSize = 20.sp,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Spacer(modifier = Modifier.height(5.dp))
-                }
-            }
-            items(userVideoItems.size) { index ->
-                val item = userVideoItems.elementAt(index)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(
-                            BorderStroke(
-                                width = 0.8.dp,
-                                color = MaterialTheme.colorScheme.secondaryContainer
-                            ),
-                            shape = RoundedCornerShape(6.dp)
+                if (userVideoItems.isNotEmpty() || downloadInfo?.state == WorkInfo.State.RUNNING) {
+                    item {
+                        Text(
+                            text = "Your own uploads",
+                            fontSize = 20.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center,
+                            fontWeight = FontWeight.SemiBold
                         )
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable {
-                            navController.navigate("video_player_screen")
-                            viewModel.playVideo(item.contentUri)
-                        },
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if(item.videoFrame != null) {
-                        Image(
-                            contentScale = ContentScale.FillBounds,
-                            bitmap = item.videoFrame,
-                            contentDescription = "file Image",
-                            modifier = Modifier
-                                .size(width = 110.dp, height = 90.dp)
-                                .clip(RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp))
+                        Spacer(modifier = Modifier.height(5.dp))
+                    }
+                }
+                items(userVideoItems.size) { index ->
+                    val item = userVideoItems.elementAt(index)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(
+                                BorderStroke(
+                                    width = 0.8.dp,
+                                    color = MaterialTheme.colorScheme.secondaryContainer
+                                ),
+                                shape = RoundedCornerShape(6.dp)
+                            )
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable {
+                                navController.navigate("video_player_screen")
+                                viewModel.playVideo(item.contentUri)
+                            },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (item.videoFrame != null) {
+                            Image(
+                                contentScale = ContentScale.FillBounds,
+                                bitmap = item.videoFrame,
+                                contentDescription = "file Image",
+                                modifier = Modifier
+                                    .size(width = 110.dp, height = 90.dp)
+                                    .clip(RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp))
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(
+                            text = item.name,
+                            fontSize = 20.sp,
+                            color = MaterialTheme.colorScheme.secondary
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                     }
-                    Text(
-                        text = item.name,
-                        fontSize = 20.sp,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.height(15.dp))
                 }
-                Spacer(modifier = Modifier.height(15.dp))
+                if (downloadInfo?.state == WorkInfo.State.RUNNING) {
+                    item {
+                        CircularProgressIndicator()
+                    }
+                }
             }
         }
     }
 }
 
-@OptIn(ExperimentalPermissionsApi::class)
+
+@ExperimentalPermissionsApi
 @Composable
 private fun RequestNotificationsPermission(
     lifecycleOwner: LifecycleOwner = LocalLifecycleOwner.current,
