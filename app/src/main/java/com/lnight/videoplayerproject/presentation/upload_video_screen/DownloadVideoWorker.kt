@@ -1,40 +1,48 @@
 package com.lnight.videoplayerproject.presentation.upload_video_screen
 
+import android.content.ContentValues
 import android.content.Context
-import android.util.Log
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.FileProvider
+import androidx.documentfile.provider.DocumentFile
 import androidx.hilt.work.HiltWorker
-import androidx.work.CoroutineWorker
-import androidx.work.ForegroundInfo
-import androidx.work.WorkerParameters
-import androidx.work.workDataOf
+import androidx.work.*
 import com.lnight.videoplayerproject.R
 import com.lnight.videoplayerproject.common.WorkerKeys
+import com.lnight.videoplayerproject.common.size
 import com.lnight.videoplayerproject.data.repository.VideoRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.ResponseBody
-import java.io.FileOutputStream
-import java.io.IOException
-import java.io.InputStream
+import java.io.*
 import kotlin.random.Random
+
 
 @HiltWorker
 class DownloadVideoWorker @AssistedInject constructor(
     @Assisted private val context: Context,
     @Assisted private val params: WorkerParameters,
     private val repository: VideoRepository
-): CoroutineWorker(appContext = context, params = params) {
+) : CoroutineWorker(appContext = context, params = params) {
 
     override suspend fun doWork(): Result {
-        Log.e("TAG", "doWork")
         startForegroundService()
         try {
+            val emptyUriError = Data.Builder()
+                .putString(WorkerKeys.ERROR_MSG, "Url cannot be empty!")
+                .build()
             val videoUri =
-                params.inputData.getString(WorkerKeys.VIDEO_URI) ?: return Result.failure()
+                params.inputData.getString(WorkerKeys.VIDEO_URI) ?: return Result.failure(
+                    emptyUriError
+                )
+            if (videoUri.isBlank()) return Result.failure(emptyUriError)
+
             val response = repository.downloadVideo(videoUri)
 
             when (response.isSuccessful) {
@@ -46,6 +54,8 @@ class DownloadVideoWorker @AssistedInject constructor(
                                 val fileName = videoUri.substring(videoUri.lastIndexOf("/") + 1)
                                 val pathToSave = context.filesDir.absolutePath + fileName
                                 uri = saveFile(body, pathToSave)
+                                val file = File(uri)
+                                uri = copyFileToDownloads(file)
                             } catch (e: IOException) {
                                 val notificationManager = NotificationManagerCompat.from(context)
                                 notificationManager.cancelAll()
@@ -55,7 +65,6 @@ class DownloadVideoWorker @AssistedInject constructor(
                                     )
                                 )
                             }
-                            Log.e("TAG", "uri -> $uri")
                             val notificationManager = NotificationManagerCompat.from(context)
                             notificationManager.cancelAll()
                             Result.success(
@@ -101,7 +110,7 @@ class DownloadVideoWorker @AssistedInject constructor(
         setForeground(
             ForegroundInfo(
                 Random.nextInt(),
-                NotificationCompat.Builder(context,"download_channel")
+                NotificationCompat.Builder(context, "download_channel")
                     .setSmallIcon(R.drawable.ic_download)
                     .setContentText("Downloading")
                     .setContentTitle("Download in progress")
@@ -125,13 +134,46 @@ class DownloadVideoWorker @AssistedInject constructor(
                 output.flush()
             }
             return pathWhereYouWantToSaveFile
-        }catch (e:Exception){
-            Log.e("saveFile", e.toString() )
-        }
-        finally {
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
             input?.close()
         }
         return ""
     }
+
+    private fun copyFileToDownloads(downloadedFile: File): String {
+        val resolver = context.contentResolver
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val contentValues = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, downloadedFile.name)
+                put(MediaStore.MediaColumns.MIME_TYPE, getMimeTypeForFile(downloadedFile))
+                put(MediaStore.MediaColumns.SIZE, downloadedFile.size)
+            }
+            resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+        } else {
+            val authority = "${context.packageName}.provider"
+            val destinyFile = File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath,
+                downloadedFile.name
+            )
+            FileProvider.getUriForFile(context, authority, destinyFile)
+        }?.also { downloadedUri ->
+            resolver.openOutputStream(downloadedUri).use { outputStream ->
+                val brr = ByteArray(1024)
+                var len: Int
+                val bufferedInputStream =
+                    BufferedInputStream(FileInputStream(downloadedFile.absoluteFile))
+                while ((bufferedInputStream.read(brr, 0, brr.size).also { len = it }) != -1) {
+                    outputStream?.write(brr, 0, len)
+                }
+                outputStream?.flush()
+                bufferedInputStream.close()
+            }
+        }.toString()
+    }
+
+    private fun getMimeTypeForFile(finalFile: File): String =
+        DocumentFile.fromFile(finalFile).type ?: "application/octet-stream"
 
 }

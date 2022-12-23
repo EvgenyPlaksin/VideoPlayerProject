@@ -29,7 +29,7 @@ class MainViewModel @Inject constructor(
     val player: Player,
     private val metadataReader: MetadataReader,
     private val app: Application
-): AndroidViewModel(app) {
+) : AndroidViewModel(app) {
 
     private val videoUris = MutableStateFlow<Set<Triple<String?, Uri, ImageBitmap?>>>(emptySet())
 
@@ -46,18 +46,18 @@ class MainViewModel @Inject constructor(
     fun addVideoUri(urisWithData: List<Pair<String?, Uri?>>) {
         viewModelScope.launch {
             urisWithData.forEach {
-                if(it.second != null) {
-                val bitmap = getFrameAsBitmap(it.second!!)
-                if (videoUris.value.find { it1 -> it1.second == it.second } == null) {
-                    videoUris.value = videoUris.value + Triple(it.first, it.second!!, bitmap)
-                    player.addMediaItem(MediaItem.fromUri(it.second!!))
-                }
+                if (it.second != null) {
+                    val bitmap = getFrameAsBitmap(it.second!!)
+                    if (videoUris.value.find { it1 -> it1.second == it.second } == null) {
+                        videoUris.value = videoUris.value + Triple(it.first, it.second!!, bitmap)
+                        player.addMediaItem(MediaItem.fromUri(it.second!!))
+                    }
                     videoUris.value.forEach { u ->
                         if (!File(u.second.toString()).exists() && u.second.scheme != "content") {
                             videoUris.value = videoUris.value - Triple(u.first, u.second, u.third)
                         }
                     }
-                  updateItems()
+                    updateItems()
                 }
             }
         }
@@ -83,18 +83,24 @@ class MainViewModel @Inject constructor(
         )
     }
 
+    fun playLocalVideo(uri: Uri) {
+        player.setMediaItem(
+            userVideoItems.find { it.contentUri == uri }?.mediaItem ?: return
+        )
+    }
+
     private fun updateItems() {
-                val newValue = videoUris.value.map { uriWithData ->
-                    VideoItem(
-                        contentUri = uriWithData.second,
-                        mediaItem = MediaItem.fromUri(uriWithData.second),
-                        name = uriWithData.first
-                            ?: metadataReader.getMetadataFromUri(uriWithData.second)?.fileName
-                            ?: "No name",
-                        videoFrame = uriWithData.third
-                    )
-                }.toSet()
-                videoItems = newValue
+        val newValue = videoUris.value.map { uriWithData ->
+            VideoItem(
+                contentUri = uriWithData.second,
+                mediaItem = MediaItem.fromUri(uriWithData.second),
+                name = uriWithData.first
+                    ?: metadataReader.getMetadataFromUri(uriWithData.second)?.fileName
+                    ?: "No name",
+                videoFrame = uriWithData.third
+            )
+        }.toSet()
+        videoItems = newValue
     }
 
     private suspend fun getFrameAsBitmap(uri: Uri, needFile: Boolean = true): ImageBitmap? {
@@ -103,7 +109,7 @@ class MainViewModel @Inject constructor(
             val file = File(uri.toString())
             withContext(Dispatchers.IO) {
                 Glide.with(app).asBitmap()
-                    .load(if(needFile) file.absolutePath else uri)
+                    .load(if (needFile) file.absolutePath else uri)
                     .apply(options)
                     .skipMemoryCache(false)
                     .placeholder(R.drawable.ic_download)

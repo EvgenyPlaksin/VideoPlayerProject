@@ -54,7 +54,8 @@ fun UploadVideoScreen(
     } else {
         rememberMultiplePermissionsState(
             listOf(
-                android.Manifest.permission.READ_EXTERNAL_STORAGE
+                android.Manifest.permission.READ_EXTERNAL_STORAGE,
+                android.Manifest.permission.WRITE_EXTERNAL_STORAGE
             )
         )
     }
@@ -414,7 +415,7 @@ fun UploadVideoScreen(
                             .clip(RoundedCornerShape(6.dp))
                             .clickable {
                                 navController.navigate("video_player_screen")
-                                viewModel.playVideo(item.contentUri)
+                                viewModel.playLocalVideo(item.contentUri)
                             },
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically

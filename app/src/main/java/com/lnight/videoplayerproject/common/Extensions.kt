@@ -11,6 +11,7 @@ import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import java.io.File
 
 
 fun Context.findActivity(): Activity? = when (this) {
@@ -67,3 +68,5 @@ fun Context.openAppDetails() {
     intent.data = uri
     startActivity(intent)
 }
+
+val File.size get() = if (!exists()) 0.0 else length().toDouble()
